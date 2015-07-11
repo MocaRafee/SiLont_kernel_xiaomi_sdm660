@@ -69,3 +69,5 @@ obj-$(CONFIG_COMPAT) += mdss_compat_utils.o
 # TODO: remove me b/62057517
 subdir-ccflags-y += \
 	-Wno-header-guard
+
+obj-$(CONFIG_FB_MSM_MDSS) += mdss_livedisplay.o
