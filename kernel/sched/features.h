@@ -99,3 +99,7 @@ SCHED_FEAT(MIN_CAPACITY_CAPPING, false)
  * OFF: Use whichever of target or backup saves most.
  */
 SCHED_FEAT(FBT_STRICT_ORDER, true)
+
+SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, false)
+
+SCHED_FEAT(HISI_FILTER, true)
