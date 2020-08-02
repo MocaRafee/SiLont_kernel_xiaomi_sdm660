@@ -117,3 +117,7 @@
 &pm660l_l3 {
 	regulator-always-on;
 };
+
+&i2c_1 {
+    qcom,clk-freq-out = <1000000>;
+};
