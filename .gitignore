@@ -99,6 +99,13 @@ ID
 *~
 \#*#
 
+out/
+anykernel/
+gcc/
+gcc32/
+clang/
+*.sh
+
 #
 # Leavings from module signing
 #
@@ -116,3 +123,8 @@ all.config
 
 # fetched Android config fragments
 android/configs/android-*.cfg
+
+#
+#Ignoring Android.bp link file
+#
+Android.bp
