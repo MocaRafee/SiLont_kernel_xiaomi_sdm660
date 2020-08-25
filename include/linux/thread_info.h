@@ -11,12 +11,9 @@
 #include <linux/bug.h>
 #include <linux/restart_block.h>
 
-<<<<<<< HEAD
-=======
 struct timespec;
 struct compat_timespec;
 
->>>>>>> 59f04f292e871fb7fd7b3425d7fd3fd489a44078
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 /*
  * For CONFIG_THREAD_INFO_IN_TASK kernels we need <asm/current.h> for the
