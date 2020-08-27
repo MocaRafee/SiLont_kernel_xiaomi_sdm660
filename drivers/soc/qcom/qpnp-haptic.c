@@ -372,7 +372,6 @@ struct qpnp_hap {
 	u32				init_drive_period_code;
 	u32				timeout_ms;
 	u32				time_required_to_generate_back_emf_us;
-	u32				vmax_default_mv;
 	u32				vmax_mv;
 	u32				vtg_min;
 	u32				vtg_max;
@@ -1873,40 +1872,48 @@ static ssize_t qpnp_hap_vmax_store(struct device *dev,
 	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
 	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
 					 timed_dev);
-	int vmax_mv, rc;
+	int data, rc;
 
-	rc = kstrtoint(buf, 10, &vmax_mv);
+	rc = kstrtoint(buf, 10, &data);
 	if (rc)
 		return rc;
 
-	hap->vmax_mv = vmax_mv;
-	rc = qpnp_hap_vmax_config(hap, vmax_mv, true);
-	if (rc < 0)
+	hap->vmax_mv = data;
+	rc = qpnp_hap_vmax_config(hap, hap->vmax_mv, true);
+	if (rc)
 		return rc;
 
 	return count;
 }
 
-static ssize_t qpnp_hap_vmax_default(struct device *dev,
+static ssize_t qpnp_hap_min_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
 	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
 					 timed_dev);
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", hap->vmax_default_mv);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", hap->vtg_min);
 }
 
-static ssize_t qpnp_hap_vmax_max(struct device *dev,
+static ssize_t qpnp_hap_max_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", QPNP_HAP_VMAX_MAX_MV);
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", hap->vtg_max);
 }
 
-static ssize_t qpnp_hap_vmax_min(struct device *dev,
+static ssize_t qpnp_hap_default_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", QPNP_HAP_VMAX_MIN_MV);
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", hap->vtg_default);
 }
 
 /* sysfs attributes */
@@ -1941,9 +1948,9 @@ static struct device_attribute qpnp_hap_attrs[] = {
 		qpnp_hap_override_auto_mode_store),
 	__ATTR(vmax_mv, 0664, qpnp_hap_vmax_show, qpnp_hap_vmax_store),
 	__ATTR(vtg_level, 0664, qpnp_hap_vmax_show, qpnp_hap_vmax_store),
-	__ATTR(vtg_default, 0444, qpnp_hap_vmax_default, NULL),
-	__ATTR(vtg_max, 0444, qpnp_hap_vmax_max, NULL),
-	__ATTR(vtg_min, 0444, qpnp_hap_vmax_min, NULL),
+	__ATTR(vtg_min, 0664, qpnp_hap_min_show, NULL),
+	__ATTR(vtg_max, 0664, qpnp_hap_max_show, NULL),
+	__ATTR(vtg_default, 0664, qpnp_hap_default_show, NULL),
 };
 
 static int calculate_lra_code(struct qpnp_hap *hap)
@@ -2434,7 +2441,7 @@ static int qpnp_hap_auto_mode_config(struct qpnp_hap *hap, int time_ms)
 			ares_cfg.calibrate_at_eop = -EINVAL;
 		}
 
-		vmax_mv = hap->vmax_mv;
+		vmax_mv = hap->vtg_max;
 		rc = qpnp_hap_vmax_config(hap, vmax_mv, true);
 		if (rc < 0)
 			return rc;
@@ -3234,12 +3241,28 @@ static int qpnp_hap_parse_dt(struct qpnp_hap *hap)
 		return rc;
 	}
 
-	hap->vmax_mv = QPNP_HAP_VMAX_MAX_MV;
-	hap->vmax_default_mv = QPNP_HAP_VMAX_MAX_MV;
+	hap->vtg_min = QPNP_HAP_VMAX_MIN_MV;
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,vtg-min", &temp);
+	if (!rc) {
+		hap->vtg_min = temp;
+	} else if (rc != -EINVAL) {
+		pr_err("Unable to read vtg_min\n");
+		return rc;
+	}
+
+	hap->vtg_max = QPNP_HAP_VMAX_MAX_MV;
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,vtg-max", &temp);
+	if (!rc) {
+		hap->vtg_max = temp;
+	} else if (rc != -EINVAL) {
+		pr_err("Unable to read vtg_max\n");
+		return rc;
+	}
+
+	hap->vmax_mv = hap->vtg_max;
 	rc = of_property_read_u32(pdev->dev.of_node, "qcom,vmax-mv", &temp);
 	if (!rc) {
 		hap->vmax_mv = temp;
-		hap->vmax_default_mv = temp;
 	} else if (rc != -EINVAL) {
 		pr_err("Unable to read vmax\n");
 		return rc;
