@@ -658,7 +658,7 @@ config TCP_CONG_CHINA
 
 config TCP_CONG_BBR
 	tristate "BBR TCP"
-	default n
+	default m
 	---help---
 
 	BBR (Bottleneck Bandwidth and RTT) TCP congestion control aims to
@@ -738,7 +738,8 @@ config DEFAULT_TCP_CONG
 	default "dctcp" if DEFAULT_DCTCP
 	default "cdg" if DEFAULT_CDG
 	default "agilesd" if DEFAULT_AGILESD
-        default "china" if DEFAULT_CHINA
+    default "china" if DEFAULT_CHINA
+    default "bbr" if DEFAULT_BBR
 	default "cubic"
 
 config TCP_MD5SIG
