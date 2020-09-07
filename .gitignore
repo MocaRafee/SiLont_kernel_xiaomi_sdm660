@@ -123,3 +123,5 @@ gcc32/
 build.sh
 wg.sh
 clang.sh
+*.sh
+anykernel/
