@@ -5271,7 +5271,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 		 * contexts of a given PID.
 		 */
 		binderfs_entry = binderfs_create_file(binder_binderfs_dir_entry_proc,
-			strbuf, &proc_show, (void *)(unsigned long)proc->pid);
+			strbuf, &binder_proc_fops, (void *)(unsigned long)proc->pid);
 		if (!IS_ERR(binderfs_entry)) {
 			proc->binderfs_entry = binderfs_entry;
 		} else {
@@ -6047,7 +6047,7 @@ static void print_binder_transaction_log_entry(struct seq_file *m,
 			"\n" : " (incomplete)\n");
 }
 
-static int binder_transaction_log_show(struct seq_file *m, void *unused)
+int binder_transaction_log_show(struct seq_file *m, void *unused)
 {
 	struct binder_transaction_log *log = m->private;
 	unsigned int log_cur = atomic_read(&log->cur);

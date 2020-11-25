@@ -104,16 +104,12 @@ static inline int __init init_binderfs(void)
 #endif
 
 int binder_stats_show(struct seq_file *m, void *unused);
-BINDER_DEBUG_ENTRY(binder_stats);
 
 int binder_state_show(struct seq_file *m, void *unused);
-BINDER_DEBUG_ENTRY(binder_state);
 
 int binder_transactions_show(struct seq_file *m, void *unused);
-BINDER_DEBUG_ENTRY(binder_transactions);
 
 int binder_transaction_log_show(struct seq_file *m, void *unused);
-BINDER_DEBUG_ENTRY(binder_transaction_log);
 
 struct binder_transaction_log_entry {
 	int debug_id;
