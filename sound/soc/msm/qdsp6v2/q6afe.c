@@ -4007,10 +4007,6 @@ int afe_get_port_index(u16 port_id)
 		return IDX_AFE_PORT_ID_QUATERNARY_MI2S_RX_3;
 	case AFE_PORT_ID_QUATERNARY_MI2S_RX_4:
 		return IDX_AFE_PORT_ID_QUATERNARY_MI2S_RX_4;
-	case RT_PROXY_PORT_002_RX:
-		return IDX_RT_PROXY_PORT_002_RX;
-	case RT_PROXY_PORT_002_TX:
-		return IDX_RT_PROXY_PORT_002_TX;
 	default:
 		pr_err("%s: port 0x%x\n", __func__, port_id);
 		return -EINVAL;
