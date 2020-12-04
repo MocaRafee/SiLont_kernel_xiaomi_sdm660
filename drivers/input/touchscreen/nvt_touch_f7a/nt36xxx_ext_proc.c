@@ -60,6 +60,13 @@ static struct proc_dir_entry *NVT_proc_pwr_plug_switch_entry;
 
 /* add touchpad information by wanghan start */
 extern char g_lcd_id[128];
+static uint8_t tp_maker_cg_lamination = 0;
+static uint8_t display_maker = 0;
+static uint8_t cg_ink_color = 0;
+static uint8_t hw_version = 0;
+static uint8_t project_id = 0;
+static uint8_t cg_maker = 0;
+static uint8_t reservation_byte = 0;
 /* add touchpad information by wanghan end */
 
 /*******************************************************
@@ -389,10 +396,6 @@ static int32_t nvt_fw_version_open(struct inode *inode, struct file *file)
 
 	NVT_LOG("++\n");
 
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
-
 	if (nvt_get_fw_info()) {
 		mutex_unlock(&ts->lock);
 		return -EAGAIN;
@@ -429,10 +432,6 @@ static int32_t nvt_baseline_open(struct inode *inode, struct file *file)
 	}
 
 	NVT_LOG("++\n");
-
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_clear_fw_status()) {
 		mutex_unlock(&ts->lock);
@@ -491,10 +490,6 @@ static int32_t nvt_raw_open(struct inode *inode, struct file *file)
 	}
 
 	NVT_LOG("++\n");
-
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_clear_fw_status()) {
 		mutex_unlock(&ts->lock);
@@ -561,10 +556,6 @@ static int32_t nvt_diff_open(struct inode *inode, struct file *file)
 
 	NVT_LOG("++\n");
 
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
-
 	if (nvt_clear_fw_status()) {
 		mutex_unlock(&ts->lock);
 		return -EAGAIN;
@@ -613,6 +604,136 @@ static const struct file_operations nvt_diff_fops = {
 	.llseek = seq_lseek,
 	.release = seq_release,
 };
+static int32_t nvt_get_oem_data(uint8_t *data, uint32_t flash_address, int32_t size)
+{
+	uint8_t buf[64] = {0};
+	uint8_t tmp_data[512] = {0};
+	int32_t count_256 = 0;
+	uint32_t cur_flash_addr = 0;
+	uint32_t cur_sram_addr = 0;
+	uint16_t checksum_get = 0;
+	uint16_t checksum_cal = 0;
+	int32_t i = 0;
+	int32_t j = 0;
+	int32_t ret = 0;
+	int32_t retry = 0;
+
+	LOG_ENTRY();
+	NVT_LOG("++\n");
+
+
+	if (size % 256)
+		count_256 = size / 256 + 1;
+	else
+		count_256 = size / 256;
+
+get_oem_data_retry:
+	nvt_sw_reset_idle();
+
+
+	nvt_stop_crc_reboot();
+
+
+	ret = Init_BootLoader();
+	if (ret < 0) {
+		goto get_oem_data_out;
+	}
+
+
+	ret = Resume_PD();
+	if (ret < 0) {
+		goto get_oem_data_out;
+	}
+
+
+	buf[0] = 0x00;
+	buf[1] = 0x35;
+	CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 2);
+	msleep(10);
+
+	for (i = 0; i < count_256; i++) {
+		cur_flash_addr = flash_address + i * 256;
+		// Step 4: Flash Read Command
+		buf[0] = 0x00;
+		buf[1] = 0x03;
+		buf[2] = ((cur_flash_addr >> 16) & 0xFF);
+		buf[3] = ((cur_flash_addr >> 8) & 0xFF);
+		buf[4] = (cur_flash_addr & 0xFF);
+		buf[5] = 0x00;
+		buf[6] = 0xFF;
+		CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 7);
+		msleep(10);
+		// Check 0xAA (Read Command)
+		buf[0] = 0x00;
+		buf[2] = 0x00;
+		CTP_I2C_READ(ts->client, I2C_HW_Address, buf, 2);
+		if (buf[1] != 0xAA) {
+			NVT_ERR("Check 0xAA (Read Command) error!! status=0x%02X\n", buf[1]);
+			ret = -1;
+			goto get_oem_data_out;
+		}
+		msleep(10);
+
+		// Step 5: Read Data and Checksum
+		for (j = 0; j < ((256 / 32) + 1); j++) {
+			cur_sram_addr = ts->mmap->READ_FLASH_CHECKSUM_ADDR + j * 32;
+			buf[0] = 0xFF;
+			buf[1] = (cur_sram_addr >> 16) & 0xFF;
+			buf[2] = (cur_sram_addr  >> 8) & 0xFF;
+			CTP_I2C_WRITE(ts->client, I2C_BLDR_Address, buf, 3);
+
+			buf[0] = cur_sram_addr & 0xFF;
+			CTP_I2C_READ(ts->client, I2C_BLDR_Address, buf, 33);
+
+			memcpy(tmp_data + j * 32, buf + 1, 32);
+		}
+
+		checksum_get = (uint16_t)((tmp_data[1] << 8) | tmp_data[0]);
+
+		checksum_cal = (uint16_t)((cur_flash_addr >> 16) & 0xFF) + (uint16_t)((cur_flash_addr >> 8) & 0xFF) + (cur_flash_addr & 0xFF) + 0x00 + 0xFF;
+		for (j = 0; j < 256; j++) {
+			checksum_cal += tmp_data[j + 2];
+		}
+		checksum_cal = 65535 - checksum_cal + 1;
+
+
+		if (checksum_get != checksum_cal) {
+			if (retry < 3) {
+				retry++;
+				goto get_oem_data_retry;
+			} else {
+				NVT_ERR("Checksum not match error! checksum_get=0x%04X, checksum_cal=0x%04X, i=%d\n", checksum_get, checksum_cal, i);
+				ret = -2;
+				goto get_oem_data_out;
+			}
+		}
+
+
+		if ((i + 1) * 256 > size) {
+			memcpy(data + i * 256, tmp_data + 2, size - i * 256);
+		} else {
+			memcpy(data + i * 256, tmp_data + 2, 256);
+		}
+	}
+
+#if 0
+	for (i = 0; i < size; i++) {
+		if (i % 16 == 0)
+			printk("\n");
+		printk("%02X ", data[i]);
+	}
+	printk("\n");
+#endif
+
+get_oem_data_out:
+	nvt_bootloader_reset();
+	nvt_check_fw_reset_state(RESET_STATE_INIT);
+
+	NVT_LOG("--\n");
+
+	LOG_DONE();
+	return ret;
+}
 
 extern bool suspend_state;
 /* add touchpad information by wanghan start */
@@ -841,10 +962,6 @@ static ssize_t nvt_pwr_plug_switch_proc_read(struct file *filp, char __user *buf
 		return -ERESTARTSYS;
 	}
 
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
-
 	nvt_get_pwr_plug_switch(&pwr_plug_switch);
 
 	mutex_unlock(&ts->lock);
@@ -896,10 +1013,6 @@ static ssize_t nvt_pwr_plug_switch_proc_write(struct file *filp, const char __us
 	if (mutex_lock_interruptible(&ts->lock)) {
 		return -ERESTARTSYS;
 	}
-
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	nvt_set_pwr_plug_switch(pwr_plug_switch);
 
